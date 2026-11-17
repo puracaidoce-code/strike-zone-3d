@@ -1,0 +1,9 @@
+{
+  "name": "STRIKE ZONE 3D",
+  "short_name": "STRIKE ZONE",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#080d12",
+  "theme_color": "#080d12",
+  "orientation": "landscape"
+}
