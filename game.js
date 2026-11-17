@@ -16,7 +16,7 @@ let scene,camera,renderer,clock,player,weaponRay,arenaGroup,weaponGroup;
 let weaponKick=0,weaponReload=0;
 let bots=[], obstacles=[], bullets=[];
 let running=false,paused=false,health=100,kills=0,ammo=30,reserve=90;
-let yaw=0,pitch=0,moveAxis=new THREE.Vector2(),lookPointer=null,lastLook={x:0,y:0};
+let yaw=0,pitch=0,moveAxis=null,lookPointer=null,lastLook={x:0,y:0};
 let lastShot=0,reloading=false,roundTime=120,spawnTimer=0,damageFlash=0;
 const raycaster=new THREE.Raycaster();
 const mats={};
@@ -26,6 +26,7 @@ function box(x,y,z,sx,sy,sz,material,name='cover'){
  const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;m.userData.solid=true;m.name=name;scene.add(m);obstacles.push(m);return m;
 }
 function init(){
+ moveAxis=new THREE.Vector2();
  scene=new THREE.Scene();scene.background=new THREE.Color(0x8a9ba0);scene.fog=new THREE.Fog(0x8a9ba0,32,95);
  camera=new THREE.PerspectiveCamera(76,innerWidth/innerHeight,.08,130);
  renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
@@ -62,11 +63,11 @@ function buildArena(){
 
 function createAKModel(){
  const gun=new THREE.Group();
- const metal=new THREE.MeshStandardMaterial({color:0x242a2b,metalness:.82,roughness:.34});
+ const metal=new THREE.MeshStandardMaterial({color:0x3b4241,metalness:.68,roughness:.38});
  const darkMetal=new THREE.MeshStandardMaterial({color:0x111718,metalness:.72,roughness:.38});
  const steel=new THREE.MeshStandardMaterial({color:0x59605e,metalness:.9,roughness:.28});
- const wood=new THREE.MeshStandardMaterial({color:0x754326,roughness:.68});
- const woodLight=new THREE.MeshStandardMaterial({color:0x986039,roughness:.72});
+ const wood=new THREE.MeshStandardMaterial({color:0xa85d2b,roughness:.62,metalness:0,emissive:0x241006,emissiveIntensity:.22});
+ const woodLight=new THREE.MeshStandardMaterial({color:0xc78343,roughness:.64,metalness:0,emissive:0x291306,emissiveIntensity:.18});
  const rubber=new THREE.MeshStandardMaterial({color:0x171a19,roughness:.95});
  const gold=new THREE.MeshStandardMaterial({color:0x9b8050,metalness:.7,roughness:.4});
  const addBox=(w,h,d,x,y,z,material,rx=0,ry=0,rz=0)=>{
@@ -153,7 +154,7 @@ function createAKModel(){
   addBox(.003,.006,.25,-.074+i*.012,.092,.28,woodLight,0,.02,0);
   addBox(.003,.006,.26,.074-i*.012,.075,-.49,wood,0,0,0);
  }
- gun.userData.basePosition=new THREE.Vector3(.34,-.31,-.60);
+ gun.userData.basePosition=new THREE.Vector3(.31,-.29,-.53);
  return gun;
 }
 
@@ -162,7 +163,7 @@ function createPlayer(){
  camera.position.set(0,1.65,0);player.add(camera);
  weaponGroup=createAKModel();
  camera.add(weaponGroup);
- weaponGroup.position.set(.34,-.31,-.60);
+ weaponGroup.position.set(.31,-.29,-.53);
  weaponGroup.rotation.set(-.025,-.025,0);
 }
 function makeBot(pos,index){
@@ -284,4 +285,4 @@ import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')
       const span = loading.querySelector('span');
       if (span) span.textContent = 'ERRO THREE.JS: ' + (error && error.message ? error.message : String(error));
     }
-  });     
+  });
