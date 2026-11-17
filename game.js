@@ -1,4 +1,5 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+let THREE;
+
 
 const $ = id => document.getElementById(id);
 const ui = {
@@ -21,7 +22,7 @@ const mats={};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function mat(color,roughness=.85){return new THREE.MeshStandardMaterial({color,roughness});}
 function box(x,y,z,sx,sy,sz,material,name='cover'){
- const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;m.userData.solid=true;m.userData.dimensions=new THREE.Vector3(sx,sy,sz);m.name=name;scene.add(m);obstacles.push(m);return m;
+ const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;m.userData.solid=true;m.name=name;scene.add(m);obstacles.push(m);return m;
 }
 function init(){
  scene=new THREE.Scene();scene.background=new THREE.Color(0x8a9ba0);scene.fog=new THREE.Fog(0x8a9ba0,32,95);
@@ -38,42 +39,11 @@ function init(){
  ui.loading.classList.add('hidden');
  animate();
 }
-function makeSandTexture(){
- const canvas=document.createElement('canvas');canvas.width=512;canvas.height=512;
- const ctx=canvas.getContext('2d');
- ctx.fillStyle='#c9b184';ctx.fillRect(0,0,512,512);
- let seed=918273;
- const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
- for(let i=0;i<38;i++){
-  const x=random()*512,y=random()*512,r=18+random()*55;
-  const g=ctx.createRadialGradient(x,y,0,x,y,r);
-  g.addColorStop(0,random()>.5?'rgba(105,83,52,.13)':'rgba(255,238,193,.20)');
-  g.addColorStop(1,'rgba(201,177,132,0)');
-  ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2);
- }
- for(let i=0;i<22000;i++){
-  const x=random()*512,y=random()*512,s=.5+random()*2.2;
-  const shade=random()>.5?'rgba(105,83,52,'+(.04+random()*.12)+')':'rgba(255,245,218,'+(.04+random()*.16)+')';
-  ctx.fillStyle=shade;ctx.fillRect(x,y,s,s);
- }
- for(let i=0;i<150;i++){
-  const x=random()*512,y=random()*512;
-  ctx.strokeStyle='rgba(112,91,61,'+(.04+random()*.10)+')';
-  ctx.lineWidth=.5+random()*1.2;ctx.beginPath();ctx.moveTo(x,y);
-  ctx.lineTo(x+random()*13,y+random()*5);ctx.stroke();
- }
- const texture=new THREE.CanvasTexture(canvas);
- texture.colorSpace=THREE.SRGBColorSpace;
- texture.wrapS=THREE.RepeatWrapping;texture.wrapT=THREE.RepeatWrapping;
- texture.repeat.set(19,19);
- texture.anisotropy=renderer.capabilities.getMaxAnisotropy();
- return texture;
-}
 function buildArena(){
  arenaGroup=new THREE.Group();scene.add(arenaGroup);
- const floor=new THREE.Mesh(new THREE.PlaneGeometry(76,76),new THREE.MeshStandardMaterial({color:0xf1dfb8,map:makeSandTexture(),roughness:1}));
- floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
- const wall=mat(0x8d826e),container=mat(0x59604d),crate=mat(0x8c704c),dark=mat(0x48463b);
+ const floor=new THREE.Mesh(new THREE.PlaneGeometry(76,76),mat(0x626c68));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+ const grid=new THREE.GridHelper(76,38,0x687a72,0x758078);grid.position.y=.012;scene.add(grid);
+ const wall=mat(0x37464b),container=mat(0x344f50),crate=mat(0x766a53),dark=mat(0x28363b);
  box(0,2,-38,76,4,1,wall,'north wall');box(0,2,38,76,4,1,wall,'south wall');
  box(-38,2,0,1,4,76,wall,'west wall');box(38,2,0,1,4,76,wall,'east wall');
  // warehouse columns and cargo cover
@@ -83,7 +53,7 @@ function buildArena(){
  box(-8,.85,17,5,1.7,2.2,crate);box(9,.85,-18,5,1.7,2.2,crate);
  box(-27,1,4,3,2,8,container);box(27,1,-5,3,2,8,container);
  // site floor markings
- const siteMat=new THREE.MeshBasicMaterial({color:0x8a7655,transparent:true,opacity:.12,depthWrite:false});
+ const siteMat=new THREE.MeshBasicMaterial({color:0x48dca1,transparent:true,opacity:.16});
  for(const [x,z] of [[-26,-25],[26,25]]){let p=new THREE.Mesh(new THREE.PlaneGeometry(10,10),siteMat);p.rotation.x=-Math.PI/2;p.position.set(x,.025,z);scene.add(p);}
  // overhead warehouse beams
  for(let z of [-25,0,25])box(0,7,z,74,.3,.4,dark,'beam');
@@ -137,7 +107,7 @@ const keys={};
 function look(dx,dy){yaw-=dx*.0032;pitch=clamp(pitch-dy*.0032,-1.25,1.25);player.rotation.y=yaw;camera.rotation.x=pitch;}
 function startGame(){
  health=100;kills=0;ammo=30;reserve=90;roundTime=120;reloading=false;paused=false;spawnBots();
- player.position.set(0,0,29);yaw=0;pitch=0;player.rotation.y=yaw;camera.rotation.set(0,0,0);
+ player.position.set(0,0,29);yaw=Math.PI;pitch=0;player.rotation.y=yaw;camera.rotation.set(0,0,0);
  ui.menu.classList.add('hidden');ui.end.classList.add('hidden');ui.hud.classList.remove('hidden');ui.pausePanel.classList.add('hidden');
  updateHud();say('ELIMINE A EQUIPE ADVERSÁRIA');running=true;clock.getDelta();
 }
@@ -178,7 +148,7 @@ function botUpdate(dt){
 function playerUpdate(dt){
  let x=moveAxis.x,z=moveAxis.y;
  if(keys.KeyW||keys.ArrowUp)z+=1;if(keys.KeyS||keys.ArrowDown)z-=1;if(keys.KeyA||keys.ArrowLeft)x-=1;if(keys.KeyD||keys.ArrowRight)x+=1;
- const v=new THREE.Vector3(x,0,z);if(v.lengthSq()>1)v.normalize();
+ const v=new THREE.Vector3(x,0,-z);if(v.lengthSq()>1)v.normalize();
  const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));
  const right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
  const delta=forward.multiplyScalar(v.z).add(right.multiplyScalar(v.x)).multiplyScalar(5.2*dt);
@@ -186,13 +156,7 @@ function playerUpdate(dt){
  // Basic collision against obstacle boxes.
  const radius=.42;
  let blocked=false;
- for(const o of obstacles){
-  const p=o.position,d=o.userData.dimensions;
-  if(!d)continue;
-  const obstacleBottom=p.y-d.y/2,obstacleTop=p.y+d.y/2;
-  const overlapsPlayerHeight=obstacleTop>0&&obstacleBottom<1.75;
-  if(overlapsPlayerHeight&&Math.abs(next.x-p.x)<d.x/2+radius&&Math.abs(next.z-p.z)<d.z/2+radius){blocked=true;break;}
- }
+ for(const o of obstacles){const p=o.position,s=o.scale;if(Math.abs(next.x-p.x)<s.x/2+radius&&Math.abs(next.z-p.z)<s.z/2+radius&&next.y<s.y){blocked=true;break;}}
  if(!blocked)player.position.copy(next);
  player.position.x=clamp(player.position.x,-35,35);player.position.z=clamp(player.position.z,-35,35);
 }
@@ -202,5 +166,18 @@ function animate(){
  renderer.render(scene,camera);
 }
 function resize(){if(!camera||!renderer)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));}
-init();
-   
+
+import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')
+  .then(module => {
+    THREE = module;
+    init();
+  })
+  .catch(error => {
+    console.error('Falha ao carregar Three.js:', error);
+    const loading = document.getElementById('loading');
+    if (loading) {
+      const span = loading.querySelector('span');
+      if (span) span.textContent = 'ERRO THREE.JS: ' + (error && error.message ? error.message : String(error));
+    }
+  });
+       
