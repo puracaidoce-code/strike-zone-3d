@@ -12,7 +12,8 @@ const ui = {
   kills:$('kills'), finalKills:$('finalKills'), endTitle:$('endTitle'),
   hitmarker:$('hitmarker'), feed:$('feed'), center:$('centerMessage')
 };
-let scene,camera,renderer,clock,player,weaponRay,arenaGroup;
+let scene,camera,renderer,clock,player,weaponRay,arenaGroup,weaponGroup;
+let weaponKick=0,weaponReload=0;
 let bots=[], obstacles=[], bullets=[];
 let running=false,paused=false,health=100,kills=0,ammo=30,reserve=90;
 let yaw=0,pitch=0,moveAxis=new THREE.Vector2(),lookPointer=null,lastLook={x:0,y:0};
@@ -58,14 +59,111 @@ function buildArena(){
  // overhead warehouse beams
  for(let z of [-25,0,25])box(0,7,z,74,.3,.4,dark,'beam');
 }
+
+function createAKModel(){
+ const gun=new THREE.Group();
+ const metal=new THREE.MeshStandardMaterial({color:0x242a2b,metalness:.82,roughness:.34});
+ const darkMetal=new THREE.MeshStandardMaterial({color:0x111718,metalness:.72,roughness:.38});
+ const steel=new THREE.MeshStandardMaterial({color:0x59605e,metalness:.9,roughness:.28});
+ const wood=new THREE.MeshStandardMaterial({color:0x754326,roughness:.68});
+ const woodLight=new THREE.MeshStandardMaterial({color:0x986039,roughness:.72});
+ const rubber=new THREE.MeshStandardMaterial({color:0x171a19,roughness:.95});
+ const gold=new THREE.MeshStandardMaterial({color:0x9b8050,metalness:.7,roughness:.4});
+ const addBox=(w,h,d,x,y,z,material,rx=0,ry=0,rz=0)=>{
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);
+  m.position.set(x,y,z);m.rotation.set(rx,ry,rz);m.castShadow=true;m.receiveShadow=true;gun.add(m);return m;
+ };
+ const addCylinder=(r1,r2,len,x,y,z,material,segments=12)=>{
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,len,segments),material);
+  m.rotation.x=Math.PI/2;m.position.set(x,y,z);m.castShadow=true;gun.add(m);return m;
+ };
+ // AK-style wooden shoulder stock and rear tang.
+ addBox(.145,.145,.39,0,.005,.29,wood,0,.025,0);
+ addBox(.16,.19,.075,0,-.012,.48,rubber);
+ addBox(.155,.035,.32,0,.078,.28,woodLight);
+ addBox(.16,.035,.32,0,-.071,.28,wood);
+ // Receiver and stamped dust cover.
+ addBox(.17,.17,.48,0,.005,-.105,metal);
+ addBox(.16,.045,.38,0,.105,-.115,steel);
+ addBox(.17,.025,.20,0,.112,-.37,metal);
+ // Front handguard, with wooden upper and lower halves.
+ addBox(.145,.105,.38,0,.035,-.49,wood);
+ addBox(.15,.035,.36,0,-.037,-.49,woodLight);
+ // Barrel, gas tube and muzzle brake.
+ addCylinder(.024,.024,.52,0,.035,-.88,darkMetal,14);
+ addCylinder(.038,.032,.13,0,.035,-1.19,steel,14);
+ addCylinder(.03,.03,.07,0,.035,-1.285,darkMetal,12);
+ // Muzzle brake slots.
+ for(let side of [-1,1]){
+  addBox(.006,.018,.045,side*.029,.035,-1.19,darkMetal);
+ }
+ // Gas block and gas tube above the barrel.
+ addBox(.075,.085,.10,0,.105,-.77,steel);
+ addBox(.085,.045,.34,0,.145,-.53,metal);
+ // Front sight block and protective ears.
+ addBox(.075,.11,.055,0,.17,-.91,metal);
+ for(let side of [-1,1]){
+  const ear=new THREE.Mesh(new THREE.TorusGeometry(.035,.009,6,12,Math.PI),metal);
+  ear.rotation.z=Math.PI;ear.position.set(side*.025,.205,-.91);gun.add(ear);
+ }
+ // Rear sight and small sight notch.
+ addBox(.09,.055,.07,0,.15,-.27,metal);
+ addBox(.045,.018,.035,0,.184,-.27,darkMetal);
+ // Curved stamped-steel magazine.
+ const magShape=new THREE.Shape();
+ magShape.moveTo(-.067,.015);magShape.lineTo(.067,.015);
+ magShape.lineTo(.07,-.12);magShape.quadraticCurveTo(.065,-.23,.025,-.34);
+ magShape.lineTo(-.045,-.34);magShape.quadraticCurveTo(-.075,-.23,-.07,-.12);
+ magShape.closePath();
+ const magGeo=new THREE.ExtrudeGeometry(magShape,{depth:.075,bevelEnabled:true,bevelSegments:2,steps:1,bevelSize:.008,bevelThickness:.008});
+ magGeo.translate(0,0,-.0375);
+ const mag=new THREE.Mesh(magGeo,metal);mag.position.set(0,-.105,-.12);mag.castShadow=true;gun.add(mag);
+ addBox(.125,.025,.09,0,-.435,-.17,darkMetal);
+ // Magazine ribs and floor plate.
+ for(let y of [-.22,-.27,-.32]){
+  addBox(.12,.009,.012,0,y,-.08,steel);
+ }
+ // Pistol grip, angled slightly backward.
+ addBox(.105,.22,.13,0,-.205,.015,rubber,.18,0,-.12);
+ addBox(.11,.035,.14,0,-.31,.035,darkMetal);
+ // Trigger and trigger guard.
+ const triggerCurve=new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-.045,-.095,-.015),new THREE.Vector3(-.045,-.205,-.12),
+  new THREE.Vector3(.045,-.205,-.12),new THREE.Vector3(.045,-.095,-.015)
+ ]);
+ const guard=new THREE.Mesh(new THREE.TubeGeometry(triggerCurve,20,.008,6,false),steel);gun.add(guard);
+ addBox(.012,.075,.012,0,-.145,-.065,gold,.15);
+ // Safety selector, receiver pins, charging handle and small rivets.
+ addBox(.018,.105,.018,.092,.005,-.08,steel,0,0,-.18);
+ addBox(.045,.018,.035,.105,.045,-.08,darkMetal,0,0,-.18);
+ addCylinder(.012,.012,.012,.091,.055,-.28,steel,10);
+ addCylinder(.012,.012,.012,.091,-.035,-.28,steel,10);
+ addBox(.035,.025,.065,.095,.12,-.17,steel);
+ // Handguard cooling slots, visible on both sides.
+ for(let side of [-1,1]){
+  for(let i=0;i<4;i++){
+   addBox(.006,.012,.045,side*.075,.035,-.38-i*.075,darkMetal);
+  }
+ }
+ // Top cover ridge and simple side rail.
+ addBox(.035,.018,.34,0,.132,-.12,darkMetal);
+ for(let i=0;i<7;i++) addBox(.19,.009,.018,0,.145,-.22+i*.045,steel);
+ // Subtle wood grain strips on the stock and handguard.
+ for(let i=0;i<3;i++){
+  addBox(.003,.006,.25,-.074+i*.012,.092,.28,woodLight,0,.02,0);
+  addBox(.003,.006,.26,.074-i*.012,.075,-.49,wood,0,0,0);
+ }
+ gun.userData.basePosition=new THREE.Vector3(.34,-.31,-.60);
+ return gun;
+}
+
 function createPlayer(){
  player=new THREE.Group();player.position.set(0,0,29);scene.add(player);
  camera.position.set(0,1.65,0);player.add(camera);
- // simple first-person rifle silhouette
- const gun=new THREE.Group();camera.add(gun);gun.position.set(.32,-.28,-.62);
- const body=new THREE.Mesh(new THREE.BoxGeometry(.18,.16,.58),mat(0x202b2e));body.position.z=-.12;gun.add(body);
- const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.42,8),mat(0x111719));barrel.rotation.x=Math.PI/2;barrel.position.set(0,.03,-.55);gun.add(barrel);
- const grip=new THREE.Mesh(new THREE.BoxGeometry(.09,.22,.12),mat(0x171d1e));grip.position.set(0,-.16,-.08);grip.rotation.x=-.2;gun.add(grip);
+ weaponGroup=createAKModel();
+ camera.add(weaponGroup);
+ weaponGroup.position.set(.34,-.31,-.60);
+ weaponGroup.rotation.set(-.025,-.025,0);
 }
 function makeBot(pos,index){
  const group=new THREE.Group();group.position.copy(pos);scene.add(group);
@@ -115,7 +213,7 @@ function togglePause(){if(!running)return;paused=!paused;ui.pausePanel.classList
 function shoot(){
  if(!running||paused||reloading||performance.now()-lastShot<155)return;
  if(ammo<=0){say('SEM MUNIÇÃO · RECARREGUE');return;}
- lastShot=performance.now();ammo--;updateHud();
+ lastShot=performance.now();ammo--;weaponKick=1;updateHud();
  const dir=new THREE.Vector3();camera.getWorldDirection(dir);
  raycaster.setFromCamera(new THREE.Vector2(0,0),camera);raycaster.far=75;
  const targets=[];
@@ -127,7 +225,7 @@ function shoot(){
  }else if(hits.length){/* cover absorbs the shot */}
  updateHud();
 }
-function reload(){if(!running||paused||reloading||ammo===30||reserve<=0)return;reloading=true;say('RECARREGANDO');setTimeout(()=>{let n=Math.min(30-ammo,reserve);ammo+=n;reserve-=n;reloading=false;updateHud()},1150);}
+function reload(){if(!running||paused||reloading||ammo===30||reserve<=0)return;reloading=true;weaponReload=1;say('RECARREGANDO');setTimeout(()=>{let n=Math.min(30-ammo,reserve);ammo+=n;reserve-=n;reloading=false;updateHud()},1150);}
 function updateHud(){ui.health.textContent=Math.ceil(health);ui.healthFill.style.width=health+'%';ui.ammo.textContent=ammo;ui.reserve.textContent=reserve;}
 function addFeed(a,b){let d=document.createElement('div');d.textContent=`${a}  ×  ${b}`;ui.feed.prepend(d);while(ui.feed.children.length>3)ui.feed.lastChild.remove();setTimeout(()=>d.remove(),3500);}
 let messageTimer;
@@ -162,6 +260,13 @@ function playerUpdate(dt){
 }
 function animate(){
  requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04);
+ if(weaponGroup){
+  weaponKick=Math.max(0,weaponKick-dt*7.5);
+  weaponReload=Math.max(0,weaponReload-dt*1.8);
+  const p=weaponGroup.userData.basePosition;
+  weaponGroup.position.set(p.x,p.y-weaponReload*.13+weaponKick*.025,p.z+weaponKick*.095+weaponReload*.10);
+  weaponGroup.rotation.x=-.025+weaponKick*.10+weaponReload*.32;
+ }
  if(running&&!paused){playerUpdate(dt);botUpdate(dt);roundTime-=dt;if(roundTime<=0){endGame(kills>=3);} }
  renderer.render(scene,camera);
 }
@@ -180,4 +285,4 @@ import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')
       if (span) span.textContent = 'ERRO THREE.JS: ' + (error && error.message ? error.message : String(error));
     }
   });
-       
+     
